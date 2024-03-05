@@ -1,7 +1,6 @@
 /*
   Special thanks to Wifi Web Server LED Blink by Tom Igoe; Roman Silivra from team Mercury AerotechMHS for code for SD card naming for non-wifi testxxx and also .csv file format example
  */
-
 #include <SPI.h>
 #include <WiFiNINA.h>
 #include <RTCZero.h>
@@ -29,7 +28,7 @@ const int NTP_PACKET_SIZE = 48;      // NTP time stamp is in the first 48 bytes 
 byte packetBuffer[NTP_PACKET_SIZE];  //buffer to hold incoming and outgoing packets
 WiFiUDP Udp;                         //wifi-related definitions
 
-IPAddress newServer(192, 168, 21, 16);  //the first three numbers MUST MATCH the hotspot. It was 123 beore, now it's 248.
+IPAddress newServer(192, 168, 123, 16);  //the first three numbers MUST MATCH the hotspot. It was 123 beore, now it's 248.
 
 
 unsigned long epoch = 0;  //seconds since jan 1 2024 12:00:00 AM
@@ -225,6 +224,9 @@ void setup() {
       }  //send a packet to the time service, receive it, and then update the time to rtc. Set rtc epoch so that the arduino can now handle timing henceforth.
       delay(1000);
     }  //get the time before moving on
+
+    newServer[2] = WiFi.localIP()[2];//make sure that the third IP number is the same as that of the hotspot. Otherwise it won't connect. The hotspot's third number is not static.
+
     WiFi.config(newServer);
   }  //initialize Wifi, initialize RTC and send a time packet to grab the real-world time
 
