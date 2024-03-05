@@ -28,7 +28,7 @@ const int NTP_PACKET_SIZE = 48;      // NTP time stamp is in the first 48 bytes 
 byte packetBuffer[NTP_PACKET_SIZE];  //buffer to hold incoming and outgoing packets
 WiFiUDP Udp;                         //wifi-related definitions
 
-IPAddress newServer(192, 168, 123, 16);  //the first three numbers MUST MATCH the hotspot. It was 123 beore, now it's 248.
+IPAddress newServer(192, 168, 16, 16);  //the first three numbers MUST MATCH the hotspot. It was 123 beore, now it's 248.
 
 
 unsigned long epoch = 0;  //seconds since jan 1 2024 12:00:00 AM
@@ -76,6 +76,7 @@ const int SDchipSelect = 10;  //for SD
 bool SDresponding = false;
 String newfilename = " chosen once the flight computer is armed";
 File dataFile;
+File webpage;
 String extracomments = "";
 //SD card definitions
 
@@ -234,7 +235,7 @@ void setup() {
     WiFi.config(newServer);
     status = WiFi.beginAP("jupiterAP", pass);
     while (status != WL_AP_LISTENING) {
-      Serial.println("Creating access point failed");
+      //Serial.println("Creating access point failed");
       // don't continue
       delay(5000);
       status = WiFi.beginAP("jupiterAP", pass);
@@ -256,7 +257,7 @@ void loop() {
       bmPressure = bmCum / bmsTaken;  //IN PASCALS, NOT HECTOPASCALS
     }
     if (ARMED) {
-
+      dataFile = SD.open(newfilename, FILE_WRITE);
       altitude = bmp.readAltitude(bmPressure * 0.01f);
       if (IMU.accelerationAvailable()) {
         IMU.readAcceleration(xaccel, yaccel, zaccel);
@@ -291,6 +292,7 @@ void loop() {
       }
     }
     millisAtLastReading = millis();
+    dataFile.close();  //close the currently open file
 
     servo.write(releaseAngle);
   }  //bmp reading and SD println
@@ -329,8 +331,46 @@ void loop() {
             client.println("HTTP/1.1 200 OK");
             client.println("Content-type:text/html");
             client.println();
+
+            if(SDresponding){
+
+              webpage = SD.open("webpage.txt", FILE_READ);//start reading the file
+              String webpageLine = "";
+              char nextc;
+              while(webpage.available()){
+                nextc = webpage.read();
+                //Serial.print(nextc);
+                if(nextc == '\n'){
+                  //Serial.println(webpageLine);
+                  client.println(webpageLine);
+                  webpageLine = "";
+                }
+                else if(nextc != '\r'){
+                  webpageLine += nextc;
+                }
+              }
+              //essentially loops through the entire file, and replaces stuff where necessary
+              webpage.close();  //close the currently open file
+            }
+
+            if(!SDresponding){
+              client.println("<!DOCTYPE HTML>");
+              client.println("<html>");
+              client.println("<head>");
+              client.println("<title>Whoopsie: SD card error</title>");
+              client.println("</head>");
+              client.println("<body>");
+              client.println("<p>the SD card is not responding. The html code is stored on there. GG WP L + ratio</p>");
+              client.println("</body>");
+              client.println("</html>");
+              
+            }//small dummy webpage if the SD card can't load for whatever reason
+
+            /*
             client.println("<!DOCTYPE HTML>");
             client.println("<html>");
+
+            
 
             // the content of the HTTP response follows the header:
             printWiFiStatus(client);
@@ -406,8 +446,11 @@ void loop() {
 
             client.print("<br> disclaimer: do not spam ARM and DISARM more than once per minute, or your data will overwrite to the same filename.");
 
-            // The HTTP response ends with another blank line:
+            
             client.println("</html>");
+            */
+
+            // The HTTP response ends with another blank line:
             client.println();
             // break out of the while loop:
             break;
@@ -426,7 +469,6 @@ void loop() {
           releaseSoon = false;
           releaseAngle = 0;
 
-          SDresponding = SD.begin(SDchipSelect);
           newfilename = SDcardFileName();
           dataFile = SD.open(newfilename, FILE_WRITE);
           dataFile.println("Time (s),Temp (C),Pressure (hPa),Altitude (m), accel x (g), accel y (g), accel z (g), omega x (dps), omega y (dps), omega z (dps), comments");  //create a new file. MAKE SURE THIS DOESNT GET CALLED TWICE IN A ROW
