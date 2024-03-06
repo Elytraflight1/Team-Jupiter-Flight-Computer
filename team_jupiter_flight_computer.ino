@@ -28,7 +28,7 @@ const int NTP_PACKET_SIZE = 48;      // NTP time stamp is in the first 48 bytes 
 byte packetBuffer[NTP_PACKET_SIZE];  //buffer to hold incoming and outgoing packets
 WiFiUDP Udp;                         //wifi-related definitions
 
-IPAddress newServer(192, 168, 16, 16);  //the first three numbers MUST MATCH the hotspot. It was 123 beore, now it's 248.
+IPAddress newServer(192, 168, 21, 16);  //the first three numbers MUST MATCH the hotspot. It changes from time to time.
 
 
 unsigned long epoch = 0;  //seconds since jan 1 2024 12:00:00 AM
@@ -365,6 +365,8 @@ void loop() {
               client.println("</html>");
               
             }//small dummy webpage if the SD card can't load for whatever reason
+
+            /**/
 
             /*
             client.println("<!DOCTYPE HTML>");
