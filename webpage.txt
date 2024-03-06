@@ -5,6 +5,15 @@
 <meta charset="UTF-8">
 <meta http-equiv="refresh" content="5">
 <title>Jupiter Flight Computer</title>
+
+<script>
+
+//ARMED = false;
+//variables = [];
+//format: each element will be an array ["id of the p tag", value], and will be spliced in directly by the Arduino code
+
+</script>
+
 </head>
 
 <body>
@@ -23,15 +32,19 @@
 
 <p id = "newfilename">The name of the SD file for this test run will be chosen once the flight computer is armed.</p>
 
-<p id = "BMPresponding">The altimeter is NOT responding.</p>
-<p id = "accelResponding">The accelerometer/gyro is NOT responding.</p>
+<p id = "BMPresponding">The altimeter is ? responding.</p>
+<p id = "accelResponding">The accelerometer/gyro is ? responding.</p>
 <p id = "bmPressure">The benchmark average pressure is ? hPa.</p>
-<p id = "ARMED">The flight computer is NOT armed for flight.</p>
+<p id = "ARMEDmsg">The flight computer is ? armed for flight.</p>
 
 <p class = "DISARMED">Click <a href="/">here</a> to refresh the page for new data.</p>
 <p class = "DISARMED">Click <a href="/0">here</a> to set the trigger angle to 0, allowing rubber band wrapping.</p>
 <p class = "DISARMED">Click <a href="/180">here</a> to set the trigger to 180, releasing rubber band.</p>
 <p class = "DISARMED">Click <a href="/A">here</a> to ARM the flight computer and prepare for launch.</p>
+
+<p id = "ARMED">Click <a href="/D">here</a> to DISARM the flight computer and receive data</p>
+
+<p>disclaimer: do not spam ARM and DISARM more than once per minute, or your data will overwrite to the same filename.</p>
 
 </body>
 
@@ -40,6 +53,29 @@
 let date = document.getElementById("date").innerHTML;
 let currentDate = new Date();
 document.getElementById("date").innerHTML = date.replace("?", currentDate.toUTCString());
+
+for(var i = 0; i < variables.length; i++){
+    let p = document.getElementById(variables[i][0]).innerHTML;
+    document.getElementById(variables[i][0]).innerHTML = p.replace("?", variables[i][1]);
+}
+
+let elms = document.getElementsByClassName("DISARMED");
+
+for(var j = 0; j < elms.length; j++){
+    if(!ARMED){
+        elms[j].style.visibility = 'visible';
+    }
+    if(ARMED){
+        elms[j].style.visibility = 'hidden';
+    }
+}
+
+
+if(ARMED){
+    document.getElementById("ARMED").style.visibility = 'visible';
+}else{
+    document.getElementById("ARMED").style.visibility = 'hidden';
+}
 
 </script>
 
