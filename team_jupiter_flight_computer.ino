@@ -93,11 +93,11 @@ bool releaseSoon = false;
 
 int triggerConfidence = 0;
 
-#define triggerAlt 2.0f
+int triggerAlt = 200;
 
 #define triggerSkepticism 5  //how many values above the threshold are required before triggering releaseSoon. This prevents a wayward wind gust from triggering the mechanism early. Higher
 
-#define debugMode false
+#define debugMode true
 
 //flight computer related definitions
 
@@ -328,6 +328,7 @@ void loop() {
           if (currentLine.length() == 0) {
             // HTTP headers always start with a response code (e.g. HTTP/1.1 200 OK)
             // and a content-type so the client knows what's coming, then a blank line:
+            
             client.println("HTTP/1.1 200 OK");
             client.println("Content-type:text/html");
             client.println();
@@ -343,6 +344,48 @@ void loop() {
                 if(nextc == '\n'){
                   //Serial.println(webpageLine);
                   client.println(webpageLine);
+                  //Serial.println(webpageLine);
+
+                  if(webpageLine.endsWith("<head>")){
+                  
+                    client.println("<script>");
+                    client.print("ARMED = ");
+                    if(ARMED){client.println("true;");}
+                    else{client.println("false;");}
+                    client.print("variables = [");
+                    //format: ["id in the html", variable value] for each array index
+                    client.print("[\"ssid\", \"" + String(WiFi.SSID()) + "\"],");//essentially this line uses a bunch of escape characters (\) to include quotation marks around the strings.
+                    //we are printing Javascript *in* html *in* the Arduino code, so there are some funny business involved.
+                    client.print("[\"ip\", \"" + WiFi.localIP().toString() + "\"],");
+                    //long rssi = WiFi.RSSI();
+                    //Serial.println(rssi);
+                    //Serial.println(rssi);
+                    //client.print("[\"rssi\", \"" + String(rssi) + "\"]");
+                    String subtext = "";
+                    if(!usingWifi){subtext="NOT ";}
+                    client.print("[\"usingWifi\", \"" + subtext + "\"],");
+                    subtext = "";
+                    if(!BMPresponding){subtext="NOT ";}
+                    client.print("[\"BMPresponding\", \"" + subtext + "\"],");
+                    subtext = "";
+                    if(!accelResponding){subtext="NOT ";}
+                    client.print("[\"accelResponding\", \"" + subtext + "\"],");
+                    subtext = "";
+                    if(!ARMED){subtext="NOT ";}
+                    client.print("[\"ARMEDmsg\", \"" + subtext + "\"],");
+
+
+                    client.print("[\"bmPressure\", \"" + String(bmPressure) + "\"],");
+                    client.print("[\"newfilename\", \"" + newfilename + "\"],");
+                    client.print("[\"triggerAlt\", \"" + String(triggerAlt) + "\"]");
+
+                    client.println("];");
+
+                    client.println("</script>");
+                    client.println("");
+
+                  }
+
                   webpageLine = "";
                 }
                 else if(nextc != '\r'){
@@ -366,97 +409,25 @@ void loop() {
               
             }//small dummy webpage if the SD card can't load for whatever reason
 
-            /**/
-
-            /*
-            client.println("<!DOCTYPE HTML>");
-            client.println("<html>");
-
-            
-
-            // the content of the HTTP response follows the header:
-            printWiFiStatus(client);
-
-            if (usingWifi) {
-              client.print("<br> The flight computer is connected via hotspot/wifi to the greater internet.");
-            } else {
-              client.print("<br> Since pins 2 and 3 are shorted together, the flight computer is NOT connected to the greater internet, and instead has created a remote access point.");
-            }
-
-            if (usingWifi) {
-
-              client.print("<br> the time currently is ");
-
-              day = rtc.getDay();
-              month = rtc.getMonth();
-              yr = rtc.getYear();
-              hr = rtc.getHours();
-              minutes = rtc.getMinutes();
-              sec = rtc.getSeconds();
-
-              client.print(month);
-              client.print("/");
-              client.print(day);
-              client.print("/");
-              client.print(yr);
-              client.print("\t");  //date
-
-              client.print(hr);
-              client.print(":");
-              client.print(minutes);
-              client.print(":");
-              client.print(sec);  //time
-
-              client.print(" Pacific Standard Time. ");  //date and time
-            }
-            client.print("<br> The name of the SD file for this test run will be ");
-            client.print(newfilename);
-
-            client.print(" . <br>");
-
-            client.print("the SD card is ");
-            if (!SDresponding) { client.print("NOT "); }
-            client.print(" responding. <br>");
-
-            client.print("<br> the altimeter is ");
-            if (!BMPresponding) { client.print("NOT "); }
-            client.print(" responding.");
-
-            client.print("<br> the accelerometer/gyro is ");
-            if (!accelResponding) { client.print("NOT "); }
-            client.print(" responding.");
-
-            client.print("<br> The benchmark average pressure is ");
-            client.print(bmPressure);
-            client.print(" hPa. <br>");
-
-            client.print("<br> The flight computer is ");
-            if (!ARMED) { client.print("NOT "); }
-            client.print("armed for flight. <br>");  //whether the flight computer is armed or not
-
-            client.print("<br> Click <a href=\"/\">here</a> to refresh the page for new data. <br>");
-
-            if (!ARMED) {
-              client.print("<br> Click <a href=\"/0\">here</a> to set the trigger angle to 0, allowing rubber band wrapping. <br>");
-              client.print("<br> Click <a href=\"/180\">here</a> to set the trigger to 180, releasing rubber band. <br>");
-              client.print("<br> Click <a href=\"/A\">here</a> to ARM the flight computer and prepare for launch <br>");
-            }
-            if (ARMED) {
-              client.print("<br> Click <a href=\"/D\">here</a> to DISARM the flight computer and receive data <br>");  //interaction options
-            }
-
-
-            client.print("<br> disclaimer: do not spam ARM and DISARM more than once per minute, or your data will overwrite to the same filename.");
-
-            
-            client.println("</html>");
-            */
-
             // The HTTP response ends with another blank line:
             client.println();
             // break out of the while loop:
             break;
           } else {  // if you got a newline, then clear currentLine:
+            int index = currentLine.indexOf("?triggerheight=");
+            if (index>0){
+              index +=15;
+              String c = String(currentLine.charAt(index));
+              String tempString = "";
+              while((c != "") && (c != " ") && (c != "\n") && (c != "\r")){
+                c = String(currentLine.charAt(index));
+                tempString = tempString + c;
+                index++;
+              }
+              //Serial.println(tempString);
+              int newAlt = tempString.toInt();
+              triggerAlt = newAlt;
+            }
             currentLine = "";
           }
         } else if (c != '\r') {  // if you got anything else but a carriage return character,
@@ -526,43 +497,8 @@ String SDcardFileName() {
       name = String("jtest" + String(SDindex) + ".csv");  //Checking each file on the SD card by pattern TEST1.csv, TEST2.csv, TEST3.csv, etc. until no file is found
     }
   }
-  //sec = rtc.getSeconds();
-  //JupiterDataLog_M_D_Y_H_M_S
-  /*name += "jupiterdatalog";
-    name += String(month);
-    name += "_";
-    name += String(day);
-    name += "_";
-    name += String(yr);
-    name += "_";
-    name += String(hr);
-    name += "_";
-    name += String(minutes);
-    name += "_";
-    name += String(sec);
-    name += ".txt";
-    name = String(name);
-    Serial.println(name);*/
-
 
   return name;
-}
-
-void printWiFiStatus(WiFiClient client) {
-  // print the SSID of the network you're attached to:
-  client.print("SSID: ");
-  client.println(WiFi.SSID());
-
-  // print your WiFi shield's IP address:
-  IPAddress ip = WiFi.localIP();
-  client.print("IP Address: ");
-  client.println(ip);
-
-  long rssi = WiFi.RSSI();
-  client.print("signal strength (RSSI):");
-  client.print(rssi);
-  client.println(" dBm");
-  client.print("<br>");
 }
 
 unsigned long sendNTPpacket(IPAddress& address) {
