@@ -97,7 +97,7 @@ int triggerAlt = 200;
 
 #define triggerSkepticism 5  //how many values above the threshold are required before triggering releaseSoon. This prevents a wayward wind gust from triggering the mechanism early. Higher
 
-#define debugMode true
+#define debugMode false
 
 //flight computer related definitions
 
