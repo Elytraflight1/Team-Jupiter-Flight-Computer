@@ -1,10 +1,8 @@
 /*
   Special thanks to Wifi Web Server LED Blink by Tom Igoe; Roman Silivra from team Mercury AerotechMHS for code for SD card naming for non-wifi testxxx and also .csv file format example
  */
-
 #include <SPI.h>
 #include <WiFiNINA.h>
-#include "arduino_secrets.h"
 #include <RTCZero.h>
 #include <Wire.h>
 #include <Adafruit_Sensor.h>
@@ -14,8 +12,8 @@
 #include <Arduino_LSM6DS3.h>
 
 ///////please enter your sensitive data in the Secret tab/arduino_secrets.h
-char ssid[] = SECRET_SSID;  // your network SSID (name)
-char pass[] = SECRET_PASS;  // your network password (use for WPA, or use as key for WEP)
+char ssid[] = "elytraflight";  // your network SSID (name)
+char pass[] = "EagleScout";  // your network password (use for WPA, or use as key for WEP)
 int keyIndex = 0;           // your network key index number (needed only for WEP)
 
 int led = LED_BUILTIN;
@@ -30,7 +28,7 @@ const int NTP_PACKET_SIZE = 48;      // NTP time stamp is in the first 48 bytes 
 byte packetBuffer[NTP_PACKET_SIZE];  //buffer to hold incoming and outgoing packets
 WiFiUDP Udp;                         //wifi-related definitions
 
-IPAddress newServer(192, 168, 21, 16);  //the first three numbers MUST MATCH the hotspot. It was 123 beore, now it's 248.
+IPAddress newServer(192, 168, 21, 16);  //the first three numbers MUST MATCH the hotspot. It changes from time to time.
 
 
 unsigned long epoch = 0;  //seconds since jan 1 2024 12:00:00 AM
@@ -78,6 +76,7 @@ const int SDchipSelect = 10;  //for SD
 bool SDresponding = false;
 String newfilename = " chosen once the flight computer is armed";
 File dataFile;
+File webpage;
 String extracomments = "";
 //SD card definitions
 
@@ -94,11 +93,11 @@ bool releaseSoon = false;
 
 int triggerConfidence = 0;
 
-#define triggerAlt 2.0f
+int triggerAlt = 200;
 
 #define triggerSkepticism 5  //how many values above the threshold are required before triggering releaseSoon. This prevents a wayward wind gust from triggering the mechanism early. Higher
 
-#define debugMode false
+#define debugMode true
 
 //flight computer related definitions
 
@@ -226,6 +225,9 @@ void setup() {
       }  //send a packet to the time service, receive it, and then update the time to rtc. Set rtc epoch so that the arduino can now handle timing henceforth.
       delay(1000);
     }  //get the time before moving on
+
+    newServer[2] = WiFi.localIP()[2];//make sure that the third IP number is the same as that of the hotspot. Otherwise it won't connect. The hotspot's third number is not static.
+
     WiFi.config(newServer);
   }  //initialize Wifi, initialize RTC and send a time packet to grab the real-world time
 
@@ -233,7 +235,7 @@ void setup() {
     WiFi.config(newServer);
     status = WiFi.beginAP("jupiterAP", pass);
     while (status != WL_AP_LISTENING) {
-      Serial.println("Creating access point failed");
+      //Serial.println("Creating access point failed");
       // don't continue
       delay(5000);
       status = WiFi.beginAP("jupiterAP", pass);
@@ -255,7 +257,7 @@ void loop() {
       bmPressure = bmCum / bmsTaken;  //IN PASCALS, NOT HECTOPASCALS
     }
     if (ARMED) {
-
+      dataFile = SD.open(newfilename, FILE_WRITE);
       altitude = bmp.readAltitude(bmPressure * 0.01f);
       if (IMU.accelerationAvailable()) {
         IMU.readAcceleration(xaccel, yaccel, zaccel);
@@ -290,6 +292,7 @@ void loop() {
       }
     }
     millisAtLastReading = millis();
+    dataFile.close();  //close the currently open file
 
     servo.write(releaseAngle);
   }  //bmp reading and SD println
@@ -325,92 +328,106 @@ void loop() {
           if (currentLine.length() == 0) {
             // HTTP headers always start with a response code (e.g. HTTP/1.1 200 OK)
             // and a content-type so the client knows what's coming, then a blank line:
+            
             client.println("HTTP/1.1 200 OK");
             client.println("Content-type:text/html");
             client.println();
-            client.println("<!DOCTYPE HTML>");
-            client.println("<html>");
 
-            // the content of the HTTP response follows the header:
-            printWiFiStatus(client);
+            if(SDresponding){
 
-            if (usingWifi) {
-              client.print("<br> The flight computer is connected via hotspot/wifi to the greater internet.");
-            } else {
-              client.print("<br> Since pins 2 and 3 are shorted together, the flight computer is NOT connected to the greater internet, and instead has created a remote access point.");
+              webpage = SD.open("webpage.txt", FILE_READ);//start reading the file
+              String webpageLine = "";
+              char nextc;
+              while(webpage.available()){
+                nextc = webpage.read();
+                //Serial.print(nextc);
+                if(nextc == '\n'){
+                  //Serial.println(webpageLine);
+                  client.println(webpageLine);
+                  //Serial.println(webpageLine);
+
+                  if(webpageLine.endsWith("<head>")){
+                  
+                    client.println("<script>");
+                    client.print("ARMED = ");
+                    if(ARMED){client.println("true;");}
+                    else{client.println("false;");}
+                    client.print("variables = [");
+                    //format: ["id in the html", variable value] for each array index
+                    client.print("[\"ssid\", \"" + String(WiFi.SSID()) + "\"],");//essentially this line uses a bunch of escape characters (\) to include quotation marks around the strings.
+                    //we are printing Javascript *in* html *in* the Arduino code, so there are some funny business involved.
+                    client.print("[\"ip\", \"" + WiFi.localIP().toString() + "\"],");
+                    //long rssi = WiFi.RSSI();
+                    //Serial.println(rssi);
+                    //Serial.println(rssi);
+                    //client.print("[\"rssi\", \"" + String(rssi) + "\"]");
+                    String subtext = "";
+                    if(!usingWifi){subtext="NOT ";}
+                    client.print("[\"usingWifi\", \"" + subtext + "\"],");
+                    subtext = "";
+                    if(!BMPresponding){subtext="NOT ";}
+                    client.print("[\"BMPresponding\", \"" + subtext + "\"],");
+                    subtext = "";
+                    if(!accelResponding){subtext="NOT ";}
+                    client.print("[\"accelResponding\", \"" + subtext + "\"],");
+                    subtext = "";
+                    if(!ARMED){subtext="NOT ";}
+                    client.print("[\"ARMEDmsg\", \"" + subtext + "\"],");
+
+
+                    client.print("[\"bmPressure\", \"" + String(bmPressure) + "\"],");
+                    client.print("[\"newfilename\", \"" + newfilename + "\"],");
+                    client.print("[\"triggerAlt\", \"" + String(triggerAlt) + "\"]");
+
+                    client.println("];");
+
+                    client.println("</script>");
+                    client.println("");
+
+                  }
+
+                  webpageLine = "";
+                }
+                else if(nextc != '\r'){
+                  webpageLine += nextc;
+                }
+              }
+              //essentially loops through the entire file, and replaces stuff where necessary
+              webpage.close();  //close the currently open file
             }
 
-            if (usingWifi) {
-
-              client.print("<br> the time currently is ");
-
-              day = rtc.getDay();
-              month = rtc.getMonth();
-              yr = rtc.getYear();
-              hr = rtc.getHours();
-              minutes = rtc.getMinutes();
-              sec = rtc.getSeconds();
-
-              client.print(month);
-              client.print("/");
-              client.print(day);
-              client.print("/");
-              client.print(yr);
-              client.print("\t");  //date
-
-              client.print(hr);
-              client.print(":");
-              client.print(minutes);
-              client.print(":");
-              client.print(sec);  //time
-
-              client.print(" Pacific Standard Time. ");  //date and time
-            }
-            client.print("<br> The name of the SD file for this test run will be ");
-            client.print(newfilename);
-
-            client.print(" . <br>");
-
-            client.print("the SD card is ");
-            if (!SDresponding) { client.print("NOT "); }
-            client.print(" responding. <br>");
-
-            client.print("<br> the altimeter is ");
-            if (!BMPresponding) { client.print("NOT "); }
-            client.print(" responding.");
-
-            client.print("<br> the accelerometer/gyro is ");
-            if (!accelResponding) { client.print("NOT "); }
-            client.print(" responding.");
-
-            client.print("<br> The benchmark average pressure is ");
-            client.print(bmPressure);
-            client.print(" hPa. <br>");
-
-            client.print("<br> The flight computer is ");
-            if (!ARMED) { client.print("NOT "); }
-            client.print("armed for flight. <br>");  //whether the flight computer is armed or not
-
-            client.print("<br> Click <a href=\"/\">here</a> to refresh the page for new data. <br>");
-
-            if (!ARMED) {
-              client.print("<br> Click <a href=\"/0\">here</a> to set the trigger angle to 0, allowing rubber band wrapping. <br>");
-              client.print("<br> Click <a href=\"/180\">here</a> to set the trigger to 180, releasing rubber band. <br>");
-              client.print("<br> Click <a href=\"/A\">here</a> to ARM the flight computer and prepare for launch <br>");
-            }
-            if (ARMED) {
-              client.print("<br> Click <a href=\"/D\">here</a> to DISARM the flight computer and receive data <br>");  //interaction options
-            }
-
-
-            client.print("<br> disclaimer: do not spam ARM and DISARM more than once per minute, or your data will overwrite to the same filename.");
+            if(!SDresponding){
+              client.println("<!DOCTYPE HTML>");
+              client.println("<html>");
+              client.println("<head>");
+              client.println("<title>Whoopsie: SD card error</title>");
+              client.println("</head>");
+              client.println("<body>");
+              client.println("<p>the SD card is not responding. The html code is stored on there. GG WP L + ratio</p>");
+              client.println("</body>");
+              client.println("</html>");
+              
+            }//small dummy webpage if the SD card can't load for whatever reason
 
             // The HTTP response ends with another blank line:
-            client.println("</html>");
             client.println();
             // break out of the while loop:
             break;
           } else {  // if you got a newline, then clear currentLine:
+            int index = currentLine.indexOf("?triggerheight=");
+            if (index>0){
+              index +=15;
+              String c = String(currentLine.charAt(index));
+              String tempString = "";
+              while((c != "") && (c != " ") && (c != "\n") && (c != "\r")){
+                c = String(currentLine.charAt(index));
+                tempString = tempString + c;
+                index++;
+              }
+              //Serial.println(tempString);
+              int newAlt = tempString.toInt();
+              triggerAlt = newAlt;
+            }
             currentLine = "";
           }
         } else if (c != '\r') {  // if you got anything else but a carriage return character,
@@ -425,7 +442,6 @@ void loop() {
           releaseSoon = false;
           releaseAngle = 0;
 
-          SDresponding = SD.begin(SDchipSelect);
           newfilename = SDcardFileName();
           dataFile = SD.open(newfilename, FILE_WRITE);
           dataFile.println("Time (s),Temp (C),Pressure (hPa),Altitude (m), accel x (g), accel y (g), accel z (g), omega x (dps), omega y (dps), omega z (dps), comments");  //create a new file. MAKE SURE THIS DOESNT GET CALLED TWICE IN A ROW
@@ -481,43 +497,8 @@ String SDcardFileName() {
       name = String("jtest" + String(SDindex) + ".csv");  //Checking each file on the SD card by pattern TEST1.csv, TEST2.csv, TEST3.csv, etc. until no file is found
     }
   }
-  //sec = rtc.getSeconds();
-  //JupiterDataLog_M_D_Y_H_M_S
-  /*name += "jupiterdatalog";
-    name += String(month);
-    name += "_";
-    name += String(day);
-    name += "_";
-    name += String(yr);
-    name += "_";
-    name += String(hr);
-    name += "_";
-    name += String(minutes);
-    name += "_";
-    name += String(sec);
-    name += ".txt";
-    name = String(name);
-    Serial.println(name);*/
-
 
   return name;
-}
-
-void printWiFiStatus(WiFiClient client) {
-  // print the SSID of the network you're attached to:
-  client.print("SSID: ");
-  client.println(WiFi.SSID());
-
-  // print your WiFi shield's IP address:
-  IPAddress ip = WiFi.localIP();
-  client.print("IP Address: ");
-  client.println(ip);
-
-  long rssi = WiFi.RSSI();
-  client.print("signal strength (RSSI):");
-  client.print(rssi);
-  client.println(" dBm");
-  client.print("<br>");
 }
 
 unsigned long sendNTPpacket(IPAddress& address) {

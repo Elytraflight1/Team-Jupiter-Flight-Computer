@@ -1,0 +1,98 @@
+<!DOCTYPE HTML>
+<html>
+
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="refresh" content="5">
+<title>Jupiter Flight Computer</title>
+<style>
+
+p {
+  font-size: 14px;
+color: rgb(0, 100, 0);
+}
+
+</style>
+
+<script>
+
+//ARMED = false;
+//variables = [];
+//format: each element will be an array ["id of the p tag", value], and will be spliced in directly by the Arduino code
+
+</script>
+
+</head>
+
+<body>
+<h1>Jupiter Flight Computer</h1>
+
+<p id = "ssid">SSID: ?</p>
+
+<p id = "ip">IP Address: ?</p>
+
+<p id = "rssi">signal strength (RSSI): ? dBm</p>
+
+<p id = "date">Date/time: ?</p>
+
+<p id = "usingWifi">The flight computer is ?connected to the greater internet.</p>
+<p>FYI: If pins 2 and 3 are shorted together (e.g. with the jumper), the flight computer instead creates a remote access point and stops trying to connect to a hotspot.</p>
+
+<p id = "newfilename">The name of the SD file for this test run will be ?.</p>
+
+<p id = "BMPresponding">The altimeter is ?responding.</p>
+<p id = "accelResponding">The accelerometer/gyro is ?responding.</p>
+<p id = "bmPressure">The benchmark average pressure is ? hPa.</p>
+<p id = "ARMEDmsg">The flight computer is ?armed for flight.</p>
+
+<p class = "DISARMED">Click <a href="/">here</a> to refresh the page for new data.</p>
+<p class = "DISARMED">Click <a href="/0">here</a> to set the trigger angle to 0, allowing rubber band wrapping.</p>
+<p class = "DISARMED">Click <a href="/180">here</a> to set the trigger to 180, releasing rubber band.</p>
+<p class = "DISARMED">Click <a href="/A">here</a> to ARM the flight computer and prepare for launch.</p>
+
+<p id = "ARMED">Click <a href="/D">here</a> to DISARM the flight computer and receive data</p>
+
+<p>disclaimer: do not spam ARM and DISARM more than once per minute, or your data will overwrite to the same filename.</p>
+
+<p id = "triggerAlt">Trigger altitude: ? meters above ground</p>
+
+<form method="GET">
+<label for="triggerheight">Enter a number here in meters to change the trigger height of the flight computer!</label><br>
+<input type="number" id="triggerheight" name="triggerheight" min="0" max="250" value="150"><br>
+<input type="submit" value="Submit">
+</form>
+
+</body>
+
+<script>
+
+let date = document.getElementById("date").innerHTML;
+let currentDate = new Date();
+document.getElementById("date").innerHTML = date.replace("?", currentDate.toUTCString());
+
+for(var i = 0; i < variables.length; i++){
+    let p = document.getElementById(variables[i][0]).innerHTML;
+    document.getElementById(variables[i][0]).innerHTML = p.replace("?", variables[i][1]);
+}
+
+let elms = document.getElementsByClassName("DISARMED");
+
+for(var j = 0; j < elms.length; j++){
+    if(!ARMED){
+        elms[j].style.display = 'inline';
+    }
+    if(ARMED){
+        elms[j].style.display = 'none';
+    }
+}
+
+
+if(ARMED){
+    document.getElementById("ARMED").style.display = 'inline';
+}else{
+    document.getElementById("ARMED").style.display = 'none';
+}
+
+</script>
+
+</html>
